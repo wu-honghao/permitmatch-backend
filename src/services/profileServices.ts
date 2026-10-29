@@ -2,8 +2,10 @@ import type { ObjectId } from "mongoose"
 import { CandidateProfileModel } from "../models/candidateProfile.js"
 import type { ProfileInput } from "../validators/profileValidator.js"
 
-export const getProfileService = async (id: string) => {
-    return await CandidateProfileModel.findById(id)
+export const getProfileService = async (userid: string) => {
+    return await CandidateProfileModel.findOne({
+        userId: userid
+    })
 }
 
 export const updateProfileService = async (userid: string, data: ProfileInput) => {

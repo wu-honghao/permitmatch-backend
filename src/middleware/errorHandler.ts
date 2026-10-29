@@ -1,9 +1,30 @@
 import type { Request, Response, NextFunction } from 'express'
 
-export const errorHandler = (err: unknown, req: Request, res: Response, next: NextFunction) => {
-    console.error(err)
-
-    return res.status(500).send({
-        message: "Internal server error"
-    })
+export class AppError extends Error {
+    constructor(
+        message: string,
+        public statusCode: number
+    ) {
+        super(message);
+        this.name = "AppError";
+    }
 }
+
+export const errorHandler = (
+    err: unknown,
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
+    if (err instanceof AppError) {
+        return res.status(err.statusCode).json({
+            message: err.message
+        });
+    }
+
+    console.error(err);
+
+    return res.status(500).json({
+        message: "Internal server error"
+    });
+};

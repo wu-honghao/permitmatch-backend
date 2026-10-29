@@ -6,6 +6,8 @@ import { errorHandler } from "./middleware/errorHandler.js"
 import userRouter from "./routes/userRoutes.js"
 import profileRoutes from "./routes/profileRoutes.js"
 import { authMiddleware } from "./middleware/authMiddleware.js"
+import jobRoutes from "./routes/jobRoutes.js"
+import analysisRoutes from "./routes/analysisRoutes.js"
 
 const app = express()
 app.use(express.json())
@@ -21,6 +23,8 @@ app.use(cors({
 
 app.use('/auth', userRouter)
 app.use('/profile', authMiddleware, profileRoutes)
+app.use('/jobs', authMiddleware, jobRoutes)
+app.use('/analyses', authMiddleware, analysisRoutes)
 app.use(errorHandler)
 
 const startServer = async () => {
