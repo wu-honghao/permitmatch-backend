@@ -109,10 +109,23 @@ export const getAnalysisById = async (userId: string, analysisId: string) => {
 }
 
 export const getAnalysesList = async (userId: string) => {
-  return AnalysisModel.find({ ownerId: userId })
-    .select(
-      '_id jobId jobSnapshot.company jobSnapshot.title skillScoreResult.score createdAt'
-    )
+    const analyses = await AnalysisModel.find({ ownerId: userId })
     .sort({ createdAt: -1 })
     .lean();
+
+    const jobIds = analyses.map(a => a.jobId);
+
+    const jobs = await JobModel.find({
+        _id: { $in: jobIds },
+        ownerId: userId
+    }).select("_id");
+
+    const existingJobIds = new Set(
+        jobs.map(job => String(job._id))
+    );
+
+    return analyses.map(analysis => ({
+        ...analysis,
+        jobExists: existingJobIds.has(String(analysis.jobId))
+    }));
 };

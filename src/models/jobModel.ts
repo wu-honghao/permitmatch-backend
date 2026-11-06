@@ -57,7 +57,7 @@ export const educationRequirementSchema = new Schema({
     },
     importance: {
         type: String,
-        required: true,
+        default: null,
         enum: ['required','preferred','review']
     },
     fieldOfStudy: {
@@ -85,7 +85,7 @@ export const experienceRequirementSchema = new Schema({
     },
     importance: {
         type: String,
-        required: true,
+        default: null,
         enum: ['required', 'preferred', 'review']
     },
     scope: {
@@ -186,7 +186,7 @@ export const jobSchema = new Schema({
     },
     rawDescription:{
         type: String,
-        required: true,
+        default: null,
     },
     title: {
         type: String,

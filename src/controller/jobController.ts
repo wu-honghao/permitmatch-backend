@@ -75,3 +75,7 @@ export const getJobDetailById = async (req: Request, res: Response) => {
         data: jobDetail
     })
 }
+
+export const getJobExtract = (req: Request, res: Response) => {
+    
+}

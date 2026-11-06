@@ -18,7 +18,7 @@ const jobSnapshotSchema = new Schema(
     },
     rawDescription: {
         type: String,
-        required: true
+        default: null
     },
     requirements: {
         type: [skillRequirementSchema],
@@ -97,7 +97,7 @@ const skillScoreResultSchema = new Schema({
 
 const profileSnapshotSchema = new Schema({
   needsPermit: {
-    type: String,
+    type: Boolean,
     default: null
   },
   targetRole: {

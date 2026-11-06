@@ -14,7 +14,7 @@ export async function findJobById(
     const result = await JobModel.findOne({
         ownerId: userId,
         _id: jobId
-    })
+    }).populate({ path: "latestAnalysisId", select: "skillScoreResult.score skillScoreResult.scoreType createdAt"})
 
     if (!result) {
         throw new AppError("Job not found", 404);

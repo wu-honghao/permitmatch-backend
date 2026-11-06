@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { addJobController, deleteJobController, jobListController, updateJobController, createAnalysisController, getAnalysisListByJobIdController, getJobDetailById } from "../controller/jobController.js";
+import { extractJobController } from "../controller/jobExtractionController.js";
 
 const jobRoutes = Router()
 
@@ -11,5 +12,6 @@ jobRoutes.patch('/:id', updateJobController)
 jobRoutes.post('/:id/analyses', createAnalysisController);
 jobRoutes.get('/:id/analyses', getAnalysisListByJobIdController);
 jobRoutes.get('/:id', getJobDetailById);
+jobRoutes.post('/extract', extractJobController)
 
 export default jobRoutes
