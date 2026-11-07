@@ -8,6 +8,7 @@ import profileRoutes from "./routes/profileRoutes.js"
 import { authMiddleware } from "./middleware/authMiddleware.js"
 import jobRoutes from "./routes/jobRoutes.js"
 import analysisRoutes from "./routes/analysisRoutes.js"
+import crossRoleSkillsGapRoutes from "./routes/crossRoleSkillsGap.js"
 
 const app = express()
 app.use(express.json())
@@ -25,6 +26,7 @@ app.use('/auth', userRouter)
 app.use('/profile', authMiddleware, profileRoutes)
 app.use('/jobs', authMiddleware, jobRoutes)
 app.use('/analyses', authMiddleware, analysisRoutes)
+app.use('/skillsGap', authMiddleware, crossRoleSkillsGapRoutes)
 app.use(errorHandler)
 
 const startServer = async () => {

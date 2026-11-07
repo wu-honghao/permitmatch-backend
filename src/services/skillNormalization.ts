@@ -80,3 +80,9 @@ export function normalizeSkill(skill: string): string {
 
   return skillAliases.get(key) ?? skill.trim();
 }
+
+export const normalizeGroup = (skills: string[]) => {
+  return [...new Set(skills.map(normalizeSkill))]
+    .sort()
+    .join("|");
+};
