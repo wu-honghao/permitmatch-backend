@@ -166,28 +166,31 @@ export function isSameRequirement(
 }
 
 export function removeDuplicateRequirements(
-  requirements: SkillRequirement[]
+    requirements: SkillRequirement[]
 ): SkillRequirement[] {
-  const removeIndexes = new Set<number>();
-  
-  // TODO: 双重循环
-  // 使用 isSameRequirement() 判断是否重复
-  // 重复时将 j 加入 removeIndexes
-  for(let i = 0; i < requirements.length; i++){
-    if (removeIndexes.has(i)) continue;
+    const removeIndexes = new Set<number>();
 
-    for(let j = i + 1; j < requirements.length; j++){
-        if (removeIndexes.has(j)) continue;
+    for (let i = 0; i < requirements.length; i++) {
+        if (removeIndexes.has(i)) continue;
 
-        const result = isSameRequirement(requirements[i],requirements[j])
+        const current = requirements[i];
+        if (!current) continue;
 
-        if(result){
-            removeIndexes.add(j)
+        for (let j = i + 1; j < requirements.length; j++) {
+            if (removeIndexes.has(j)) continue;
+
+            const next = requirements[j];
+            if (!next) continue;
+
+            const result = isSameRequirement(current, next);
+
+            if (result) {
+                removeIndexes.add(j);
+            }
         }
     }
-  }
 
-  return requirements.filter(
-    (_, index) => !removeIndexes.has(index)
-  );
+    return requirements.filter(
+        (_, index) => !removeIndexes.has(index)
+    );
 }

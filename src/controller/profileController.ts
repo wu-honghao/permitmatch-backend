@@ -2,6 +2,7 @@ import type { Request, Response } from "express"
 import { getProfileService, updateProfileService } from "../services/profileServices.js"
 import mongoose from "mongoose"
 import { profileSchema } from "../validators/profileValidator.js"
+import { AppError } from "../middleware/errorHandler.js"
 
 export const getProfile = async (req: Request, res: Response) => {
     if(!mongoose.isObjectIdOrHexString(req.userId) || req.userId === undefined){
@@ -19,24 +20,28 @@ export const getProfile = async (req: Request, res: Response) => {
 }
 
 export const updateProfile = async (req: Request, res: Response) => {
-    const result = profileSchema.safeParse(req.body)
+    const userId = req.userId;
 
-    if(!result.success){
-        return res.status(400).send({
-            message: 'Invalid body',
-        })
+    if (!userId) {
+        throw new AppError("Unauthorized", 401);
     }
 
-    const { data } = result
-    const profile = await updateProfileService(req.userId, data)
-    if(!profile){
-        return res.status(404).send({
-            message: 'Invalid userId or profile'
-        })
+    const result = profileSchema.safeParse(req.body);
+
+    if (!result.success) {
+        throw new AppError("Invalid body", 400);
     }
 
-    return res.status(200).send({
-        message: 'success',
+    const { data } = result;
+
+    const profile = await updateProfileService(userId, data);
+
+    if (!profile) {
+        throw new AppError("Invalid userId or profile", 404);
+    }
+
+    return res.status(200).json({
+        message: "success",
         data: profile
-    })
-}
+    });
+};

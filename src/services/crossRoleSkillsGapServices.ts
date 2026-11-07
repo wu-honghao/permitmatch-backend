@@ -1,11 +1,27 @@
 import { JobModel } from "../models/jobModel.js";
 import { normalizeGroup } from "./skillNormalization.js";
 
+type SkillCoverage = {
+    missingSkills: string[][];
+};
+
+type PopulatedAnalysis = {
+    skillScoreResult: {
+        required: SkillCoverage;
+        preferred: SkillCoverage;
+    };
+};
+
 export async function crossRoleSkillsGap(userId: string){
     // 找到该用户所有的 Job
     // 关联处 analyses skills 中的 missingskills
 
-    const result = await JobModel.find({ ownerId: userId }).populate('latestAnalysisId','skillScoreResult.required skillScoreResult.preferred')
+    const result = await JobModel.find({ ownerId: userId })
+    .populate<{ latestAnalysisId: PopulatedAnalysis | null }>(
+        "latestAnalysisId",
+        "skillScoreResult.required skillScoreResult.preferred"
+    )
+    .lean();
 
     const jobsGapCount = new Map<string, { requiredCount: number, preferredCount: number }>()
 
@@ -15,36 +31,36 @@ export async function crossRoleSkillsGap(userId: string){
 
         totalJobs++;
 
-            const { missingSkills: missingSkillsRequired } = job.latestAnalysisId.skillScoreResult.required
-            const { missingSkills: missingSkillsPreferred } = job.latestAnalysisId.skillScoreResult.preferred
+        const { missingSkills: missingSkillsRequired } = job.latestAnalysisId.skillScoreResult.required
+        const { missingSkills: missingSkillsPreferred } = job.latestAnalysisId.skillScoreResult.preferred
 
-            const resultRequired = (missingSkillsRequired ?? []).map(normalizeGroup);
-            const resultPreferred = (missingSkillsPreferred ?? []).map(normalizeGroup);
+        const resultRequired = (missingSkillsRequired ?? []).map(normalizeGroup);
+        const resultPreferred = (missingSkillsPreferred ?? []).map(normalizeGroup);
 
-            const jobsGap = new Map<string, "required" | "preferred">();
+        const jobsGap = new Map<string, "required" | "preferred">();
 
-            for(let preferredGap of resultPreferred){
-                jobsGap.set(preferredGap, "preferred")
+        for(let preferredGap of resultPreferred){
+            jobsGap.set(preferredGap, "preferred")
+        }
+
+        for(let requiredGap of resultRequired){
+            jobsGap.set(requiredGap, "required")
+        }
+
+        for(let [skill, category] of jobsGap){
+            const count = jobsGapCount.get(skill) ?? {
+                requiredCount: 0,
+                preferredCount: 0
             }
 
-            for(let requiredGap of resultRequired){
-                jobsGap.set(requiredGap, "required")
+            if(category === 'required'){
+                count.requiredCount ++ 
+            }
+            if(category === 'preferred'){
+                count.preferredCount ++ 
             }
 
-            for(let [skill, category] of jobsGap){
-                const count = jobsGapCount.get(skill) ?? {
-                    requiredCount: 0,
-                    preferredCount: 0
-                }
-
-                if(category === 'required'){
-                    count.requiredCount ++ 
-                }
-                if(category === 'preferred'){
-                    count.preferredCount ++ 
-                }
-
-                jobsGapCount.set(skill, count)
+            jobsGapCount.set(skill, count)
         }
     }
 

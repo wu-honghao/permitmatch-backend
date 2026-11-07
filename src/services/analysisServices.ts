@@ -57,7 +57,17 @@ export const createAnalysis = async (userId: string, jobid: string) => {
             throw new AppError("Invalid job requirements", 400);
         }
 
-        const skillScoreResult = calculateSkillScore(profile.skills, job.requirements)
+        const requirements = job.requirements.map((item) => ({
+            category: item.category,
+            operator: item.operator ?? "all",
+            skills: item.skills,
+            rawContent: item.rawContent ?? null
+        }));
+
+        const skillScoreResult = calculateSkillScore(
+            profile.skills,
+            requirements
+        );
         
         const analysis = new AnalysisModel({
             ownerId: userId,
