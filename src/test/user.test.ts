@@ -1,92 +1,93 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import request from 'supertest'
-import app from '../app.js'
-import { UserModel } from '../models/userModel.js'
-import bcrypt from 'bcryptjs'
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import request from "supertest";
+import app from "../app.js";
+import { UserModel } from "../models/userModel.js";
+import { connectTestDB, disconnectTestDB } from "./testDb.js";
+import { createTestUser } from "./helpers/testAuth.js";
+import mongoose from "mongoose";
 
-const LOGIN_EMAIL = 'test-login-001@example.com'
-const REGISTER_EMAIL = 'test-register-001@example.com'
-const DUPLICATE_EMAIL = 'test-duplicate-001@example.com'
+const PASSWORD = "12234444";
 
-beforeAll(async ()=>{
-    // create test user
-    const hashedPassword = await bcrypt.hash('1223444', 10)
-    await UserModel.create({
-        email: LOGIN_EMAIL,
-        password: hashedPassword
-    })
+let loginUser: Awaited<ReturnType<typeof createTestUser>>;
+let duplicateUser: Awaited<ReturnType<typeof createTestUser>>;
+let registerEmail: string;
 
-    await UserModel.deleteMany({
-        email: {
-            $in:[REGISTER_EMAIL,DUPLICATE_EMAIL]
+beforeAll(async () => {
+    await connectTestDB();
+
+    loginUser = await createTestUser();
+    duplicateUser = await createTestUser();
+
+    registerEmail = `register-${crypto.randomUUID()}@example.com`;
+}, 15000);
+
+afterAll(async () => {
+    try {
+        if (mongoose.connection.readyState === 1) {
+            await UserModel.deleteMany({
+                email: {
+                    $in: [
+                        loginUser?.email,
+                        duplicateUser?.email,
+                        registerEmail
+                    ].filter(Boolean)
+                }
+            });
         }
-    })
-})
+    } finally {
+        await disconnectTestDB();
+    }
+}, 15000);
 
-afterAll(async ()=>{
-    await UserModel.deleteMany({
-        email: {
-            $in:[REGISTER_EMAIL,DUPLICATE_EMAIL,LOGIN_EMAIL]
-        }
-    })
-})
+describe("user", () => {
+    it("should return 401 when the login password is wrong", async () => {
+        const res = await request(app)
+            .post("/auth/login")
+            .send({
+                email: loginUser.email,
+                password: "wrong-password"
+            });
 
-describe('user',()=>{
-    // POST /auth/login
-    // 错误密码
-    // → 401
+        expect(res.status).toBe(401);
+    });
 
-    it('should return 401 when the login password is wrong', async () => {
-        const res = await request(app).post('/auth/login').send({
-            email: LOGIN_EMAIL,
-            password: '1223'
-        })
+    it("should return 200 when email and password is correct", async () => {
+        const res = await request(app)
+            .post("/auth/login")
+            .send({
+                email: loginUser.email,
+                password: "Test123456!"
+            });
 
-        expect(res.status).toBe(401)
-    })
+        expect(res.status).toBe(200);
+        expect(res.body.data.token).toBeDefined();
+    });
 
-    // POST /auth/login
-    // 正确 email + 正确 password
-    // → 200
+    it("should return 201 when registering a new user", async () => {
+        const res = await request(app)
+            .post("/auth/register")
+            .send({
+                email: registerEmail,
+                password: PASSWORD
+            });
 
-    it('should return 200 when email and password is correct',async ()=>{
-        const res = await request(app).post('/auth/login').send({
-            email: LOGIN_EMAIL,
-            password:'1223444'
-        })
+        expect(res.status).toBe(201);
 
-        expect(res.status).toBe(200)
-        expect(res.body.data.token).toBeDefined()
-    })
+        const savedUser = await UserModel.findOne({
+            email: registerEmail
+        });
 
-    // POST /auth/register
-    // 新的 email + password
-    // → 201
-    it('should return 201 when email and password is correct',async ()=>{
-        const res = await request(app).post('/auth/register').send({
-            email: REGISTER_EMAIL,
-            password: '1223444'
-        })
+        expect(savedUser).not.toBeNull();
+    });
 
-        expect(res.status).toBe(201)
-    })
+    it("should return 409 when email already exists", async () => {
+        const res = await request(app)
+            .post("/auth/register")
+            .send({
+                email: duplicateUser.email,
+                password: PASSWORD
+            });
 
-    // 同一个 email 再注册一次
-    // → 409
-
-    it('should return 409 when email is exist',async ()=>{
-        const hashedPassword = await bcrypt.hash('1223444', 10)
-
-        await UserModel.create({
-            email: DUPLICATE_EMAIL,
-            password: hashedPassword
-        })
-
-        const res = await request(app).post('/auth/register').send({
-            email: DUPLICATE_EMAIL,
-            password: '1223444'
-        })
-
-        expect(res.status).toBe(409)
-    })
-})
+        expect(res.status).toBe(409);
+    });
+});

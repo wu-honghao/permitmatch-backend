@@ -1,63 +1,72 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import app from "../app.js";
-import request from 'supertest'
+import request from "supertest";
 import { UserModel } from "../models/userModel.js";
-import bcrypt from "bcryptjs";
 import { CandidateProfileModel } from "../models/candidateProfile.js";
+import mongoose from "mongoose";
+import { connectTestDB, disconnectTestDB } from "./testDb.js";
+import { createTestUser } from "./helpers/testAuth.js";
 
-const LOGINEMAIL_PROFILE = 'test-profile01@example.com' 
-const LOGINPASSWORD_PROFILE = '1223444'
+let token = "";
+let userId = "";
 
-let token = ''
-let userId = ''
+beforeAll(async () => {
+    await connectTestDB();
 
-beforeAll(async ()=>{
-   const hashedPassword = await bcrypt.hash(LOGINPASSWORD_PROFILE, 10)
+    const user = await createTestUser();
 
-   const user = await UserModel.create({
-    email: LOGINEMAIL_PROFILE,
-    password: hashedPassword,
-   })
+    token = user.token;
+    userId = user.userId;
+}, 15000);
 
-  userId = user._id.toString()
+afterAll(async () => {
+    try {
+        if (userId && mongoose.connection.readyState === 1) {
+            await CandidateProfileModel.deleteMany({ userId });
+            await UserModel.deleteOne({ _id: userId });
+        }
+    } finally {
+        await disconnectTestDB();
+    }
+}, 15000);
 
-   const loginResult = await request(app)
-    .post('/auth/login')
-    .send({
-      email: LOGINEMAIL_PROFILE,
-      password: LOGINPASSWORD_PROFILE,
-    })
+describe("profile", () => {
+    test("Should get profile when login", async () => {
+        const res = await request(app)
+            .get("/profile")
+            .set("Authorization", `Bearer ${token}`);
 
-   token = loginResult.body.data.token
-})
+        expect(res.status).toBe(200);
+        expect(res.body.data).toBeDefined();
+    });
 
-afterAll(async ()=>{
-    await CandidateProfileModel.deleteMany({
-        userId
-    })
-
-    await UserModel.deleteOne({
-        _id: userId,
-    })
-})
-
-describe('profile',() => {
-    test('Should get profile when login', async () => {
-        const result = await request(app).get('/profile').set('authorization', `Bearer ${token}`)
-        
-        expect(result.status).toBe(200)
-    })
-
-    test('Should update profile when login', async () => {
-        const result = await request(app).put('/profile').set('authorization', `Bearer ${token}`).send({
+    test("Should update profile when login", async () => {
+        const profileData = {
             needsPermit: true,
-            targetRole: 'softwore engineer',
-            educationLevel: 'bachelor',
+            targetRole: "Software Engineer",
+            educationLevel: "bachelor",
             yearsExperience: 3,
-            skills: [],
-            preferredLocation: 'Cork'
-        })
+            skills: ["React", "TypeScript"],
+            preferredLocation: "Cork"
+        };
 
-        expect(result.status).toBe(200)
-    })
-})
+        const res = await request(app)
+            .put("/profile")
+            .set("Authorization", `Bearer ${token}`)
+            .send(profileData);
+
+        expect(res.status).toBe(200);
+
+        // 验证实际返回数据
+        expect(res.body.data.targetRole).toBe("Software Engineer");
+        expect(res.body.data.skills).toEqual(["React", "TypeScript"]);
+
+        // 验证数据库确实保存成功
+        const savedProfile = await CandidateProfileModel.findOne({ userId });
+
+        expect(savedProfile).not.toBeNull();
+        expect(savedProfile?.targetRole).toBe("Software Engineer");
+        expect(savedProfile?.yearsExperience).toBe(3);
+        expect(savedProfile?.skills).toEqual(["React", "TypeScript"]);
+    });
+});

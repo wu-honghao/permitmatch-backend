@@ -26,7 +26,9 @@ describe('skillScoring',() => {
         expect(result.scoreType).toBe('required_only')
         expect(result.required).toEqual({
             matched: 1,
-            total: 1
+            total: 1,
+            coveredSkills: ["React"],
+            missingSkills: []
         });
     })
 })
