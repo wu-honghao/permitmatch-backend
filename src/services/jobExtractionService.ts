@@ -1,6 +1,7 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { ApiError, GoogleGenAI } from "@google/genai";
 import { z } from "zod";
+import { AppError } from "../middleware/errorHandler.js";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY!,
@@ -9,7 +10,7 @@ const ai = new GoogleGenAI({
 const requirementSchema = z.object({
   category: z.enum(["required", "preferred", "review"]),
   operator: z.enum(["all", "any"]).nullable(),
-  skills: z.array(z.string()),
+  skills: z.array(z.string().trim().min(1)),
   rawContent: z.string().nullable(),
 });
 
@@ -55,12 +56,16 @@ const draftSchema = z.object({
 export const extractJobDescription = async (
   rawDescription: string
 ) => {
-  const response = await ai.models.generateContent({
+  try{
+      const response = await ai.models.generateContent({
     model: process.env.GEMINI_MODEL || "gemini-3.5-flash-lite",
 
     contents: rawDescription,
 
     config: {
+      httpOptions: {
+        timeout: 15000,
+      },
       systemInstruction: `
 You are a professional job description information extraction engine for PermitMatch, a software job matching application.
 
@@ -296,7 +301,7 @@ Do not include explanations, Markdown, or additional fields.
   });
 
   if (!response.text) {
-    throw new Error("Gemini returned an empty response");
+    throw new AppError("AI returned an empty response", 502);
   }
 
   const draft = draftSchema.parse(
@@ -307,4 +312,39 @@ Do not include explanations, Markdown, or additional fields.
     ...draft,
     rawDescription,
   };
+  } catch(error){
+    console.log(error)
+
+      if (error instanceof ApiError) {
+        if (error.status === 503) {
+          throw new AppError(
+            "AI service temporarily unavailable",
+            503
+          );
+        }
+
+        if (error.status === 429) {
+          throw new AppError(
+            "AI provider rate limit exceeded",
+            503
+          );
+        }
+      }
+
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new AppError(
+          "AI request timed out",
+          504
+        );
+      }
+
+      if (error instanceof SyntaxError || error instanceof z.ZodError) {
+        throw new AppError(
+          "AI returned invalid structured data",
+          502
+        );
+      }
+
+      throw error
+  }
 };

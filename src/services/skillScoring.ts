@@ -1,5 +1,10 @@
-import { matchSkillRequirement, type SkillRequirement } from "./skillMatching.js";
-import { normalizeSkill } from "./skillNormalization.js";
+import { getSkillKey, normalizeGroup, normalizeSkill } from "./skillNormalization.js";
+
+export type SkillRequirement = {
+  category: 'required' | 'preferred' | 'review';
+  operator: 'all' | 'any' | null;
+  skills: string[];
+};
 
 type SkillCoverage = {
   matched: number;
@@ -22,65 +27,17 @@ type SkillScoreResult = {
   hasPendingReview: boolean;
 };
 
-function calculateCoverage(
-  userSkills: string[],
-  requirements: SkillRequirement[],
-  category: 'required' | 'preferred'
-): SkillCoverage {
-  const normalizedUserSkills = new Set(
-    userSkills.map(normalizeSkill)
-  );
+// calculateSkillScore()
+//     │
+//     ├── normalizeRequirement()
+//     │
+//     ├── removeDuplicateRequirements()
+//     │      └── isSameRequirement()
+//     │
+//     └── calculateCoverage()
+//            └── getSkillKey()
 
-  const coverage: SkillCoverage = {
-    matched: 0,
-    total: 0,
-    coveredSkills: [],
-    missingSkills: []
-  };
-
-  for (const requirement of requirements) {
-    if (
-      requirement.category !== category ||
-      requirement.operator === null ||
-      requirement.skills.length === 0
-    ) {
-      continue;
-    }
-
-    if (requirement.operator === 'all') {
-      coverage.total += requirement.skills.length;
-
-      for (const skill of requirement.skills) {
-        if (normalizedUserSkills.has(normalizeSkill(skill))) {
-          coverage.matched++;
-          coverage.coveredSkills.push(skill);
-        } else {
-          coverage.missingSkills.push([skill]);
-        }
-      }
-    }
-
-    if (requirement.operator === 'any') {
-      coverage.total++;
-
-      const matchedSkills = requirement.skills.filter(skill =>
-        normalizedUserSkills.has(normalizeSkill(skill))
-      );
-
-      if (matchedSkills.length > 0) {
-        coverage.matched++;
-        coverage.coveredSkills.push(...matchedSkills);
-      } else {
-        coverage.missingSkills.push([...requirement.skills]);
-      }
-    }
-  }
-
-  coverage.coveredSkills = [...new Set(coverage.coveredSkills)];
-
-  return coverage;
-}
-
+// 核心评分入口
 export function calculateSkillScore(
   userSkills: string[],
   requirements: SkillRequirement[] 
@@ -113,15 +70,13 @@ export function calculateSkillScore(
   let score: SkillScoreResult['score'] = null
   let scoreType : SkillScoreResult['scoreType'] = 'unavailable'
 
-  if(!hasPendingReview){
-    if(required.total > 0 && preferred.total > 0){
-        score = Math.round(((required.matched / required.total) * 0.8 + (preferred.matched / preferred.total) * 0.2) * 100)
-        scoreType = 'weighted'
-    }
-    else if(required.total > 0 && preferred.total === 0){
-        score = Math.round(((required.matched / required.total) * 1)  * 100)
-        scoreType = 'required_only'
-    }
+  if(required.total > 0 && preferred.total > 0){
+      score = Math.round(((required.matched / required.total) * 0.8 + (preferred.matched / preferred.total) * 0.2) * 100)
+      scoreType = 'weighted'
+  }
+  else if(required.total > 0 && preferred.total === 0){
+      score = Math.round(((required.matched / required.total) * 1)  * 100)
+      scoreType = 'required_only'
   }
 
   // TODO: 返回 SkillScoreResult
@@ -134,37 +89,27 @@ export function calculateSkillScore(
   }
 }
 
-export function normalizeRequirement(requirements: SkillRequirement): SkillRequirement{
-    return {
-        ...requirements,
-        skills: [...new Set(requirements.skills.map((skill)=>{
-            return normalizeSkill(skill)
-        }))]
+// 组内技能标准化、去重
+export function normalizeRequirement(
+  requirement: SkillRequirement
+): SkillRequirement {
+  const uniqueSkills = new Map<string, string>();
+
+  for (const skill of requirement.skills) {
+    const key = getSkillKey(skill);
+
+    if (!uniqueSkills.has(key)) {
+      uniqueSkills.set(key, normalizeSkill(skill));
     }
-}
-
-export function isSameRequirement(
-  groupA: SkillRequirement,
-  groupB: SkillRequirement
-): boolean {
-  // TODO
-  if(groupA.category !== groupB.category || groupA.operator !== groupB.operator){
-    return false
   }
 
-  const groupASkillRequirement = normalizeRequirement(groupA)
-  const groupBSkillRequirement = normalizeRequirement(groupB)
-
-  if(groupASkillRequirement.skills.length !== groupBSkillRequirement.skills.length){
-    return false
-  }
-
-  const groupASkillString = groupASkillRequirement.skills.sort().join('|')
-  const groupBSkillString = groupBSkillRequirement.skills.sort().join('|')
-
-  return groupASkillString === groupBSkillString
+  return {
+    ...requirement,
+    skills: [...uniqueSkills.values()]
+  };
 }
 
+// 删除重复要求组
 export function removeDuplicateRequirements(
     requirements: SkillRequirement[]
 ): SkillRequirement[] {
@@ -193,4 +138,77 @@ export function removeDuplicateRequirements(
     return requirements.filter(
         (_, index) => !removeIndexes.has(index)
     );
+}
+
+// 判断要求组是否重复
+export function isSameRequirement(
+  groupA: SkillRequirement,
+  groupB: SkillRequirement
+): boolean {
+  // TODO
+  if(groupA.category !== groupB.category || groupA.operator !== groupB.operator){
+    return false
+  }
+
+  return normalizeGroup(groupA.skills) === normalizeGroup(groupB.skills);
+}
+
+// 实际负责覆盖率统计
+export function calculateCoverage(
+  userSkills: string[],
+  requirements: SkillRequirement[],
+  category: 'required' | 'preferred'
+): SkillCoverage {
+  const normalizedUserSkills = new Set(
+    userSkills.map(getSkillKey)
+  );
+
+  const coverage: SkillCoverage = {
+    matched: 0,
+    total: 0,
+    coveredSkills: [],
+    missingSkills: []
+  };
+
+  for (const requirement of requirements) {
+    if (
+      requirement.category !== category ||
+      requirement.operator === null ||
+      requirement.skills.length === 0
+    ) {
+      continue;
+    }
+
+    if (requirement.operator === 'all') {
+      coverage.total += requirement.skills.length;
+
+      for (const skill of requirement.skills) {
+        if (normalizedUserSkills.has(getSkillKey(skill))) {
+          coverage.matched++;
+          coverage.coveredSkills.push(skill);
+        } else {
+          coverage.missingSkills.push([skill]);
+        }
+      }
+    }
+
+    if (requirement.operator === 'any') {
+      coverage.total++;
+
+      const matchedSkills = requirement.skills.filter(skill =>
+        normalizedUserSkills.has(getSkillKey(skill))
+      );
+
+      if (matchedSkills.length > 0) {
+        coverage.matched++;
+        coverage.coveredSkills.push(...matchedSkills);
+      } else {
+        coverage.missingSkills.push([...requirement.skills]);
+      }
+    }
+  }
+
+  coverage.coveredSkills = [...new Set(coverage.coveredSkills)];
+
+  return coverage;
 }

@@ -21,19 +21,6 @@ const jobData = {
     "currency": "EUR",
     "period": "year"
   },
-  "contract": {
-    "type": "permanent",
-    "durationMonths": null
-  },
-  "educationRequirement": {
-    "rawContent": "Bachelor's degree in Computer Science or equivalent",
-    "level": "bachelor"
-  },
-  "experienceRequirement": {
-    "rawContent": "At least 2 years of commercial development experience",
-    "minYears": 2,
-    "maxYears": null
-  },
   "requirements": [
     {
       "category": "required",
@@ -48,8 +35,27 @@ const jobData = {
       "rawContent": "Experience with Docker or AWS is desirable"
     }
   ],
-  "permitSupport": {
-    "status": "unknown"
+  "contract": {
+    rawContent: null,
+    type: "permanent",
+    durationMonths: null
+  },
+  educationRequirement: {
+    rawContent: "Bachelor's degree in Computer Science or equivalent",
+    level: "bachelor",
+    importance: null,
+    fieldOfStudy: null
+  },
+  experienceRequirement: {
+    rawContent: "At least 2 years of commercial development experience",
+    minYears: 2,
+    maxYears: null,
+    importance: null,
+    scope: null
+  },
+  permitSupport: {
+    rawContent: null,
+    status: "unknown"
   }
 }
 

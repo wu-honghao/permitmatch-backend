@@ -1,5 +1,5 @@
 import { JobModel } from "../models/jobModel.js";
-import { normalizeGroup } from "./skillNormalization.js";
+import { normalizeGroup, normalizeSkill } from "./skillNormalization.js";
 
 type SkillCoverage = {
     missingSkills: string[][];
@@ -66,7 +66,7 @@ export async function crossRoleSkillsGap(userId: string){
 
     const gaps = [...jobsGapCount].map(([skill, counts])=>{
         return {
-            skills: skill.split('|'),
+            skills: skill.split('|').map(normalizeSkill),
             ...counts,
             totalCount: counts.requiredCount + counts.preferredCount
         }

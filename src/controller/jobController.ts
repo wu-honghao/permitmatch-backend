@@ -11,6 +11,7 @@ import {
     createAnalysis,
     getAnalysisListByJobId
 } from "../services/analysisServices.js";
+import { createJobValidator, updateJobValidator } from "../validators/jobValidator.js";
 
 export const jobListController = async (req: Request, res: Response) => {
     const userId = req.userId;
@@ -26,9 +27,14 @@ export const jobListController = async (req: Request, res: Response) => {
 
 export const addJobController = async (req: Request, res: Response) => {
     const userId = req.userId;
+    const validator = createJobValidator.safeParse(req.body)
+
+    if(!validator.success){
+        throw new AppError("Invalid job data", 400); 
+    }
     if (!userId) throw new AppError("Unauthorized", 401);
 
-    const result = await addJob(userId, req.body);
+    const result = await addJob(userId, validator.data);
 
     return res.status(201).json({
         message: "success",
@@ -40,6 +46,9 @@ export const updateJobController = async (req: Request, res: Response) => {
     const userId = req.userId;
     const id = req.params.id;
 
+    const jobValidator = updateJobValidator.safeParse(req.body)
+
+    if(!jobValidator.success) throw new AppError("Invalid job data", 400)
     if (!userId) throw new AppError("Unauthorized", 401);
     if (typeof id !== "string") {
         throw new AppError("Invalid job ID", 400);
@@ -47,7 +56,7 @@ export const updateJobController = async (req: Request, res: Response) => {
 
     const result = await updateJob(userId, {
         id,
-        job: req.body
+        job: jobValidator.data
     });
 
     if (!result) {

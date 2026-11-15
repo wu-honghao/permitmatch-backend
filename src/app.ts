@@ -7,9 +7,11 @@ import { authMiddleware } from "./middleware/authMiddleware.js";
 import jobRoutes from "./routes/jobRoutes.js";
 import analysisRoutes from "./routes/analysisRoutes.js";
 import crossRoleSkillsGapRoutes from "./routes/crossRoleSkillsGap.js";
+import helmet from "helmet";
 
 const app = express();
 
+app.use(helmet());
 app.use(express.json());
 
 app.use(cors({

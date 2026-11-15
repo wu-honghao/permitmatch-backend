@@ -1,22 +1,21 @@
 import type { Request, Response } from "express";
 import { extractJobDescription } from "../services/jobExtractionService.js";
 import { AppError } from "../middleware/errorHandler.js";
+import { createJobExtractionValidator } from "../validators/jobExtractionValidator.js";
 
 export const extractJobController = async (
   req: Request,
   res: Response
 ) => {
-  const { rawDescription } = req.body ?? {};
+  const validator = createJobExtractionValidator.safeParse(req.body)
 
   if (
-    typeof rawDescription !== "string" ||
-    rawDescription.trim().length < 30 ||
-    rawDescription.length > 20000
+    !validator.success
   ) {
     throw new AppError("Invalid job description", 400);
   }
 
-  const draft = await extractJobDescription(rawDescription);
+  const draft = await extractJobDescription(validator.data.rawDescription);
 
   res.status(200).json({ message: 'success', data: draft });
 };

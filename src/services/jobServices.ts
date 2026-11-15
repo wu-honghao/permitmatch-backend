@@ -1,6 +1,7 @@
 import { AppError } from "../middleware/errorHandler.js";
 import { JobModel, type Job } from "../models/jobModel.js";
 import { Types } from 'mongoose';
+import type { CreateJobInput, UpdateJobInputValidtor } from "../validators/jobValidator.js";
 
 export async function findJobById(
   userId: string,
@@ -36,9 +37,7 @@ export const editableFields = [
     "requirements"
 ]
 
-type createJobFields = Omit<Job, "ownerId" | "latestAnalysisId">
-
-export async function addJob(userId: string, job: createJobFields){
+export async function addJob(userId: string, job: CreateJobInput){
     if (
         !Types.ObjectId.isValid(userId)
     ) {
@@ -69,13 +68,9 @@ export async function addJob(userId: string, job: createJobFields){
     })
 }
 
-type UpdateJobFields = Partial<
-  Omit<Job, "ownerId" | "latestAnalysisId">
->;
-
 type UpdateJobInput = {
   id: string;
-  job: UpdateJobFields;
+  job: UpdateJobInputValidtor;
 };
 
 export async function updateJob(userId: string, updateInput: UpdateJobInput){

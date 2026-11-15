@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { addJobController, deleteJobController, jobListController, updateJobController, createAnalysisController, getAnalysisListByJobIdController, getJobDetailById } from "../controller/jobController.js";
 import { extractJobController } from "../controller/jobExtractionController.js";
+import { globalAiLimiter } from "../middleware/globalAiLimiter.js";
+import { userAiLimiter } from "../middleware/userAiLimiter.js";
 
 const jobRoutes = Router()
 
@@ -12,6 +14,6 @@ jobRoutes.patch('/:id', updateJobController)
 jobRoutes.post('/:id/analyses', createAnalysisController);
 jobRoutes.get('/:id/analyses', getAnalysisListByJobIdController);
 jobRoutes.get('/:id', getJobDetailById);
-jobRoutes.post('/extract', extractJobController)
+jobRoutes.post('/extract', globalAiLimiter, userAiLimiter, extractJobController)
 
 export default jobRoutes
