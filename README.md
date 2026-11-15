@@ -1,42 +1,47 @@
 # PermitMatch — Backend
 
-Backend API for **PermitMatch**, a web application that helps software job seekers in Ireland compare their skills with job requirements, identify gaps, and review previous analyses.
+REST API for **PermitMatch**, a web application that helps software job seekers in Ireland compare their skills with job requirements, understand missing skills, and track analyses over time.
 
-PermitMatch focuses on **explainable skill matching**, not predicting hiring outcomes or determining eligibility for an Irish employment permit. Permit-related information is presented as supporting context, not an immigration decision.
+PermitMatch provides **explainable, rule-based skill matching**. It does **not** predict hiring outcomes, measure a candidate's proficiency, or determine eligibility for an Irish employment permit.
 
-> **Project status:** MVP backend implemented; automated testing and deployment hardening are in progress.
+> **Status:** MVP V1 implemented and deployed. Testing and maintenance are ongoing.
 
 ## Features
 
-- **Authentication:** account registration, login and JWT-protected endpoints.
-- **Candidate profile:** stores career targets, skills, experience, education, preferred location and permit needs.
-- **Job management:** create, list, view, update and delete job records, including structured requirements and the original job description.
-- **Skill matching:** normalizes skills and aliases, supports `all` (AND) and `any` (OR) requirement groups, and distinguishes required from preferred skills.
-- **Explainable scoring:** reports matched, covered and missing skills; uses an 80/20 required/preferred weighting when both categories are available, with `required_only` and `unavailable` results where appropriate.
-- **Analysis history:** saves snapshots of the candidate profile and job at analysis time, preserving the context of past results.
-- **Cross-job skill gaps:** summarizes skills repeatedly missing across a user's analyzed jobs.
-- **Ownership checks:** restricts jobs and analyses to their respective users.
-- **Atomic analysis creation:** uses a MongoDB transaction to save an analysis and update the job's latest analysis reference together.
+- **Authentication:** Register, log in, and access protected endpoints using JSON Web Tokens (JWT).
+- **Candidate profiles:** Store a target role, skills, experience, education, preferred location, and employment-permit needs.
+- **Job management:** Create, view, update, list, and delete jobs, retaining both the original job description and structured requirements.
+- **AI-assisted extraction:** Use Google Gemini to turn a pasted job description into an editable structured draft. The user reviews the draft before saving; manual entry remains available if extraction fails.
+- **Skill normalization:** Map common technology aliases to consistent names for comparison and reporting.
+- **Explainable matching:** Evaluate required and preferred skill groups, including `all` (AND) and `any` (OR) conditions.
+- **Scoring:** Weight required and preferred group coverage at 80% and 20% when both are available; handle required-only and unscorable cases separately.
+- **Analysis history:** Save job and profile snapshots so previous analyses retain their original context.
+- **Cross-job skill gaps:** Aggregate recurring missing requirements across jobs, with job-level deduplication.
+- **Access control:** Scope jobs and analyses to their authenticated owner.
+- **Consistent updates:** Use a MongoDB transaction when creating an analysis and updating the job's latest analysis reference.
+- **Request protection:** Validate input with Zod, apply security middleware and rate limiting, and return consistent API errors.
 
 ## Tech Stack
 
-| Layer | Technologies |
+| Area | Technologies |
 | --- | --- |
 | Runtime | Node.js, TypeScript |
-| API | Express 5 |
-| Database | MongoDB Atlas, Mongoose |
-| Authentication | JSON Web Tokens (JWT), bcryptjs |
-| Validation | Zod, Mongoose schema validation |
-| Tests | Vitest, Supertest |
-| Tooling | tsx, Docker |
+| HTTP API | Express 5 |
+| Database | MongoDB Atlas, Mongoose 9 |
+| Authentication | JSON Web Tokens, bcryptjs |
+| Validation | Zod 4, Mongoose validation |
+| AI extraction | Google Gemini via `@google/genai` |
+| Security | Helmet, CORS, `express-rate-limit` |
+| Testing | Vitest, Supertest |
+| Development / build | tsx, TypeScript compiler |
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js compatible with the project's `package.json` (Node.js 22 is used in the Dockerfile)
-- npm
-- A MongoDB connection (MongoDB Atlas or a compatible MongoDB deployment)
+- Node.js and npm compatible with the versions declared in `package.json`
+- A MongoDB deployment that supports transactions (for example, a MongoDB Atlas replica set)
+- A Gemini API key if you want to use AI-assisted extraction
 
 ### Installation
 
@@ -46,42 +51,42 @@ npm ci
 
 ### Environment variables
 
-Create a `.env` file in the backend root directory:
+Create `.env` in the backend project root:
 
 ```dotenv
 MONGODB_URI=mongodb+srv://<user>:<password>@<cluster>/permitmatch
 JWT_SECRET=replace-with-a-long-random-secret
 FRONTEND_ORIGIN=http://localhost:5173
 PORT=3000
+GEMINI_API_KEY=your-gemini-api-key
+# Optional, if supported by your extraction service configuration:
+GEMINI_MODEL=gemini-3.5-flash-lite
 ```
 
-**Do not commit `.env`, `.env.test`, passwords, tokens or API keys.** The exact variable names should match your current server configuration. Optional experimental job-extraction code may require `GEMINI_API_KEY` and `GEMINI_MODEL`; it is not part of the core manual-entry skill-matching workflow.
+Use the actual variable names and model supported by your deployed configuration. Never commit real secrets, `.env`, or `.env.test`.
 
-### Development
+**Important:** AI extraction uses an external provider and can fail, time out, or be rate limited. The manual job-entry workflow must remain usable.
+
+### Start locally
 
 ```bash
 npm run dev
 ```
 
-The API typically listens on `http://localhost:3000`. Verify the port against your local `src/server.ts` configuration.
+By default, the API is configured for `http://localhost:3000` when `PORT=3000`.
 
-### Production build
+### Build and run
 
 ```bash
 npm run build
+npm start
 ```
 
-If you have separated application initialization (`src/app.ts`) from server startup (`src/server.ts`), run the compiled server entry point:
-
-```bash
-node dist/server.js
-```
-
-Ensure `package.json` and the Dockerfile use the same server entry point. The earlier project archive used `src/app.ts` as its entry point, so check these scripts before deploying.
+The `start` script runs `node dist/server.js`. Ensure your TypeScript output configuration builds to that path.
 
 ## API Overview
 
-Routes other than registration and login require a bearer token:
+All endpoints except registration and login require a bearer token:
 
 ```http
 Authorization: Bearer <JWT_TOKEN>
@@ -91,80 +96,108 @@ Authorization: Bearer <JWT_TOKEN>
 | --- | --- | --- |
 | POST | `/auth/register` | Register an account |
 | POST | `/auth/login` | Log in |
-| GET | `/auth/me` | Get authenticated user |
-| GET | `/profile` | Get candidate profile |
-| PUT | `/profile` | Update candidate profile |
-| GET | `/jobs` | List owned jobs |
+| GET | `/auth/me` | Get the authenticated user |
+| GET | `/profile` | Get the candidate profile |
+| PUT | `/profile` | Update the candidate profile |
+| GET | `/jobs` | List the user's jobs |
 | POST | `/jobs` | Create a job |
+| POST | `/jobs/extract` | Extract an editable job draft from a description |
 | GET | `/jobs/:id` | Get an owned job |
-| PATCH | `/jobs/:id` | Update a job |
-| DELETE | `/jobs/:id` | Delete a job |
-| POST | `/jobs/:id/analyses` | Create a skill analysis |
-| GET | `/jobs/:id/analyses` | List analyses for a job |
-| GET | `/analyses` | List analysis history |
-| GET | `/analyses/:id` | Get a saved analysis |
-| GET | `/skillsGap` | Aggregate cross-job skill gaps |
+| PATCH | `/jobs/:id` | Update an owned job |
+| DELETE | `/jobs/:id` | Delete an owned job |
+| POST | `/jobs/:id/analyses` | Generate and save a skill analysis |
+| GET | `/jobs/:id/analyses` | List a job's analyses |
+| GET | `/analyses` | List saved analyses |
+| GET | `/analyses/:id` | View an analysis snapshot |
+| GET | `/skillsGap` | Aggregate recurring skill gaps |
 
-Endpoints and request bodies are subject to the application's current validators and schemas. Some routes in the repository may be experimental rather than part of the supported MVP.
+Request and response shapes are defined by the current controllers, schemas, and validators.
 
-## How Skill Analysis Works
+## How Matching Works
 
-1. A user maintains a candidate profile containing their skills.
-2. They save a job and confirm its required and preferred skill groups.
-3. Skills and aliases are normalized; `all` groups require every member while `any` groups accept an alternative.
-4. The scoring service calculates coverage and missing skills and returns a score when sufficient requirements are available.
-5. The analysis is stored with profile and job snapshots; the job's `latestAnalysisId` is updated in the same database transaction.
+1. The user saves a profile containing their skills.
+2. A job is entered manually or drafted with AI and then reviewed by the user.
+3. The backend normalizes technology names and evaluates requirement groups: `all` means every member is needed, while `any` means at least one member is needed.
+4. Coverage is calculated **per requirement group**, not per individual skill.
+5. If both required and preferred groups exist, the score is calculated as:
 
-**Important:** Skill scores indicate rule-based requirement coverage. They do **not** measure proficiency, guarantee an interview or job offer, or constitute an employment-permit eligibility assessment.
+   ```text
+   score = required coverage × 80% + preferred coverage × 20%
+   ```
+
+6. When only required groups are available, required coverage determines the full score. When there are no scorable groups, the result is unavailable.
+7. The analysis is saved with job and profile snapshots, while the job's `latestAnalysisId` is updated in the same transaction.
+
+Scores indicate **requirement coverage only**—not likelihood of employment or actual skill proficiency.
 
 ## Testing
-
-The test suite includes pure skill-matching tests, schema validation tests and database-backed API tests. Recent local runs confirmed existing tests plus successful creation, rollback and ownership checks for analyses; the latest changes should be retested after checkout.
 
 ```bash
 npm run test:run
 npm run build
 ```
 
-Integration tests use a **separate database**. Create `.env.test` locally, for example:
+For watch mode:
+
+```bash
+npm test
+```
+
+For coverage (requires the configured coverage tooling):
+
+```bash
+npm run coverage
+```
+
+Integration tests must use an isolated test database. For example, configure a local `.env.test` with:
 
 ```dotenv
 MONGODB_TEST_URI=mongodb+srv://<user>:<password>@<cluster>/permitmatch_test
 JWT_SECRET=replace-with-a-test-only-secret
 ```
 
-- Never point integration tests at the development or production database.
-- Test data may be created and deleted during a test run.
-- MongoDB transactions require a deployment that supports transactions, such as an Atlas replica set.
-- Exclude `dist/` from Vitest discovery to avoid running compiled tests twice.
+- Never run destructive tests against development or production data.
+- MongoDB transactions require transaction-capable deployment configuration.
+- The repository contains Vitest/Supertest tooling; consult the test files for currently covered cases.
 
-## Project Layout
+## Project Structure
 
 ```text
 src/
-├── app.ts                # Express setup and routing
-├── server.ts             # Database connection and HTTP listener (after split)
-├── controller/           # Request handlers
-├── middleware/           # JWT authentication and error handling
-├── models/               # Mongoose schemas
-├── routes/               # HTTP routes
-├── services/             # Matching, analysis and business logic
-├── test/                 # Vitest and Supertest tests
-├── types/                # Type declarations
-└── validators/           # Request validation
+├── app.ts          # Express app and middleware setup
+├── server.ts       # Database connection and HTTP listener
+├── controller/     # HTTP request handlers
+├── middleware/     # Authentication and error handling
+├── models/         # Mongoose schemas
+├── routes/         # Route definitions
+├── services/       # Matching, extraction and business logic
+├── validators/     # Zod request validation
+├── types/          # Shared TypeScript declarations
+└── test/           # Automated tests
 ```
 
-## Frontend
+Adjust this tree if your repository's actual folder names differ.
 
-The frontend is developed in a separate React + TypeScript repository: **`permitmatch-frontend`**. Add its GitHub URL here after publication.
+## Deployment
 
-## Deployment Notes
+The backend is deployed as an AWS-hosted API, with MongoDB Atlas as its database.
 
-- Provide secrets and the MongoDB URI through environment variables or your hosting platform's secret manager.
-- Restrict CORS to the deployed frontend origin.
-- Ensure your MongoDB network access and permissions are configured appropriately.
-- Run build and tests before deployment, and point the Docker entry point at the compiled server file.
+**Production API:** https://d38890yu916wq0.cloudfront.net
+
+Deployment considerations:
+
+- Supply JWT, database, and Gemini credentials through server-side environment variables or a secrets manager.
+- Allow CORS only from the intended frontend origin.
+- Use HTTPS for public traffic.
+- Keep rate limits and error handling enabled for AI-assisted extraction.
+- Confirm your container/startup command matches `npm start` and `dist/server.js`.
+- Do not expose `GEMINI_API_KEY`, `JWT_SECRET`, or database credentials to the frontend.
+
+## Related Application
+
+- **Live frontend:** https://d3omusoi6mx2kn.cloudfront.net
+- **Frontend repository:** `permitmatch-frontend` (add the GitHub link when available)
 
 ## Disclaimer
 
-PermitMatch is a portfolio and decision-support project. Its skill analysis is informational, and any employment permit guidance should be verified against current official Irish government sources.
+PermitMatch is a portfolio and decision-support project. Its scores and permit-related notes are informational only. Employment-permit requirements should be checked against current official Irish government guidance.
