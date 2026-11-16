@@ -19,6 +19,17 @@ export const errorHandler = (
     next: NextFunction
 ) => {
     if (err instanceof AppError) {
+        if (err.statusCode >= 500) {
+            req.log.error(
+                {
+                    requestId: req.id,
+                    statusCode: err.statusCode,
+                    errorName: err.name,
+                },
+                err.message
+            );
+        }
+
         return res.status(err.statusCode).json({
             message: err.message
         });
@@ -45,10 +56,13 @@ export const errorHandler = (
         });
     }
 
-    console.error("Unhandled API error:", {
-        name: err instanceof Error ? err.name : "UnknownError",
-        message: err instanceof Error ? err.message : String(err),
-    });
+    req.log.error(
+        {
+            requestId: req.id,
+            errorName: err instanceof Error ? err.name : "UnknownError",
+        },
+        "Unhandled API error"
+    );
 
     return res.status(500).json({
         message: "Internal server error"

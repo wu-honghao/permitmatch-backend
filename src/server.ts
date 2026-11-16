@@ -20,9 +20,43 @@ const startServer = async () => {
 
         console.log("MongoDB connected");
 
-        app.listen(port, () => {
+        const server = app.listen(port, () => {
             console.log(`Server running on port ${port}`);
         });
+
+        let shuttingDown = false;
+
+        const shutdown = (signal: string) => {
+            if (shuttingDown) return;
+            shuttingDown = true;
+
+            console.log(`${signal} received. Shutting down...`);
+
+            const timer = setTimeout(() => {
+                console.error("Shutdown timed out");
+                process.exit(1);
+            }, 10000);
+
+            timer.unref();
+
+            server.close(async (error) => {
+                try {
+                    if (error) throw error;
+
+                    await mongoose.disconnect();
+
+                    clearTimeout(timer);
+                    console.log("Server stopped");
+                    process.exit(0);
+                } catch (error) {
+                    console.error("Shutdown failed:", error);
+                    process.exit(1);
+                }
+            });
+        };
+
+        process.on("SIGINT", () => shutdown("SIGINT"));
+        process.on("SIGTERM", () => shutdown("SIGTERM"));
     } catch (error) {
         console.error("Server startup failed:", error);
         process.exit(1);
