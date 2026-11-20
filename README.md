@@ -4,7 +4,7 @@ REST API for **PermitMatch**, a web application that helps software job seekers 
 
 PermitMatch provides **explainable, rule-based skill matching**. It does **not** predict hiring outcomes, measure a candidate's proficiency, or determine eligibility for an Irish employment permit.
 
-> **Status:** MVP V1 implemented and deployed. Testing and maintenance are ongoing.
+> **Status:** MVP V1 implemented and deployed. Backend automated test coverage exceeds 90% for lines (latest local report: 20 November 2026). Frontend testing and CI/CD automation are ongoing.
 
 ## Features
 
@@ -32,7 +32,7 @@ PermitMatch provides **explainable, rule-based skill matching**. It does **not**
 | Validation | Zod 4, Mongoose validation |
 | AI extraction | Google Gemini via `@google/genai` |
 | Security | Helmet, CORS, `express-rate-limit` |
-| Testing | Vitest, Supertest |
+| Testing | Vitest, Supertest, V8 coverage, Mongoose integration tests |
 | Development / build | tsx, TypeScript compiler |
 
 ## Getting Started
@@ -118,65 +118,91 @@ Request and response shapes are defined by the current controllers, schemas, and
 1. The user saves a profile containing their skills.
 2. A job is entered manually or drafted with AI and then reviewed by the user.
 3. The backend normalizes technology names and evaluates requirement groups: `all` means every member is needed, while `any` means at least one member is needed.
-4. Coverage is calculated **per requirement group**, not per individual skill.
-5. If both required and preferred groups exist, the score is calculated as:
+4. Coverage uses a **hybrid scoring unit**: for an `all` (AND) requirement, each listed skill contributes one unit; for an `any` (OR) requirement, the entire group contributes one unit, counted as matched if at least one option is covered. Duplicate requirements and skill aliases are normalized before scoring.
+5. If both required and preferred scorable requirements exist, the score is calculated as:
 
    ```text
    score = required coverage × 80% + preferred coverage × 20%
    ```
 
-6. When only required groups are available, required coverage determines the full score. When there are no scorable groups, the result is unavailable.
+6. When only required requirements are scorable, required coverage determines the full score. When no required requirements are scorable, the result is unavailable. Scores are rounded to the nearest whole number.
 7. The analysis is saved with job and profile snapshots, while the job's `latestAnalysisId` is updated in the same transaction.
 
 Scores indicate **requirement coverage only**—not likelihood of employment or actual skill proficiency.
 
 ## Testing
 
+The backend uses **Vitest** for automated tests and **Supertest** for HTTP-level checks. Tests are organised by what they verify:
+
+- **Unit tests (`src/test/unit/`):** Isolated business logic, matching and skill normalisation, data validation, and service behaviour with mocked external dependencies (including Gemini and selected Mongoose methods).
+- **HTTP controller tests (`src/test/integration/`):** Real Express routing, authentication, validation, response codes and error handling. Some tests mock the service or database layer; these are controller/component tests, **not** full database integration tests.
+- **Database integration tests (`src/test/integration/`):** Real MongoDB test-database interactions, access isolation, analysis creation, snapshots and transaction rollback.
+
+### Run tests
+
 ```bash
+# Unit tests
+npx vitest run src/test/unit
+
+# HTTP and database integration tests
+npx vitest run src/test/integration
+
+# All tests
 npm run test:run
+
+# All tests + coverage
+npm run coverage
+
+# TypeScript build
 npm run build
 ```
 
-For watch mode:
+Watch mode: `npm test`.
 
-```bash
-npm test
-```
+### Latest backend coverage
 
-For coverage (requires the configured coverage tooling):
+**Local Vitest V8 coverage report — 20 November 2026** (unit and integration suites together):
 
-```bash
-npm run coverage
-```
+| Metric | Coverage |
+| --- | ---: |
+| Lines | **91.25%** |
+| Statements | 89.57% |
+| Branches | 80.51% |
+| Functions | 98.63% |
+| Services — Lines | 93.00% |
 
-Integration tests must use an isolated test database. For example, configure a local `.env.test` with:
+The **90%+ target is achieved for line coverage**, not for every coverage metric. Coverage alone does not establish correctness; integration tests additionally verify persistence, permissions and consistency. CI enforcement is planned rather than claimed as implemented.
+
+### Test database safety
+
+Database integration tests require a separate, transaction-capable MongoDB deployment. Configure `.env.test` in the backend project root:
 
 ```dotenv
 MONGODB_TEST_URI=mongodb+srv://<user>:<password>@<cluster>/permitmatch_test
 JWT_SECRET=replace-with-a-test-only-secret
 ```
 
-- Never run destructive tests against development or production data.
-- MongoDB transactions require transaction-capable deployment configuration.
-- The repository contains Vitest/Supertest tooling; consult the test files for currently covered cases.
+The test database helper validates that the selected database name is `permitmatch_test`. Never run destructive tests against development or production databases; never commit real `.env` files or credentials.
 
 ## Project Structure
 
 ```text
 src/
-├── app.ts          # Express app and middleware setup
-├── server.ts       # Database connection and HTTP listener
-├── controller/     # HTTP request handlers
-├── middleware/     # Authentication and error handling
-├── models/         # Mongoose schemas
-├── routes/         # Route definitions
-├── services/       # Matching, extraction and business logic
-├── validators/     # Zod request validation
-├── types/          # Shared TypeScript declarations
-└── test/           # Automated tests
+├── app.ts             # Express app and middleware setup
+├── server.ts          # Database connection and HTTP listener
+├── controller/        # HTTP request handlers
+├── middleware/        # Authentication, rate limits, error handling
+├── models/            # Mongoose schemas
+├── routes/            # Route definitions
+├── services/          # Matching, extraction and business logic
+├── validators/        # Zod request validation
+├── types/             # Shared TypeScript declarations
+└── test/
+    ├── unit/          # Mock-based unit tests and schema tests
+    ├── integration/   # HTTP/controller and real DB integration tests
+    ├── helpers/       # Test utilities
+    └── testDb.ts      # Isolated MongoDB connection helper
 ```
-
-Adjust this tree if your repository's actual folder names differ.
 
 ## Deployment
 
@@ -196,7 +222,7 @@ Deployment considerations:
 ## Related Application
 
 - **Live frontend:** https://d3omusoi6mx2kn.cloudfront.net
-- **Frontend repository:** `permitmatch-frontend` (add the GitHub link when available)
+- **Frontend repository:** `permitmatch-frontend`
 
 ## Disclaimer
 
