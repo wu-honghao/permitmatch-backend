@@ -1,6 +1,6 @@
 import { test, expect } from "vitest";
 import mongoose from "mongoose";
-import { connectTestDB, disconnectTestDB } from "./testDb.js";
+import { connectTestDB, disconnectTestDB } from "../testDb.js";
 
 test("Connect to MongoDB Atlas test database", async () => {
     try {

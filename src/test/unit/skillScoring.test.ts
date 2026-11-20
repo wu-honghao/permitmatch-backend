@@ -1,9 +1,9 @@
 import { describe, expect, it} from "vitest";
-import { calculateSkillScore, removeDuplicateRequirements } from "../services/skillScoring.js";
-import type { SkillRequirement } from "../services/skillMatching.js";
+import { calculateSkillScore, removeDuplicateRequirements } from "../../services/skillScoring.js";
+import type { SkillRequirement } from "../../services/skillMatching.js";
 
 describe('skillScoring',() => {
-    it('T0', () => {
+    it('T0: deduplicates skill aliases before calculating a score', () => {
         const userSkills = [
             'ReactJS',
         ];
@@ -34,7 +34,7 @@ describe('skillScoring',() => {
 })
 
 describe('removeDuplicateRequirements',()=>{
-    it('T01',() => {
+    it('T01: deduplicates equivalent OR requirements',() => {
         const requirements: SkillRequirement[] = [
             {
                 category: 'required',
@@ -54,7 +54,7 @@ describe('removeDuplicateRequirements',()=>{
         expect(requirements).toHaveLength(2);
     })
 
-    it('T02',() => {
+    it('T02: deduplicates equivalent AND requirements',() => {
         const requirements: SkillRequirement[] = [
             {
                 category: 'required',
@@ -79,7 +79,7 @@ describe('removeDuplicateRequirements',()=>{
         expect(requirements).toHaveLength(3);
     })
 
-    it('T03',() => {
+    it('T03: preserves distinct requirement groups',() => {
         const requirements: SkillRequirement[] = [
             {
                 category: 'required',

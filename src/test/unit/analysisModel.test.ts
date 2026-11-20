@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { AnalysisModel } from '../models/analysisModel.js';
+import { AnalysisModel } from '../../models/analysisModel.js';
 import mongoose from 'mongoose';
 
 describe('AnalysisModel validation', () => {
-  it('T01', async () => {
+  it('T01: validates a complete analysis document', async () => {
     const analysis = new AnalysisModel({
         ownerId: new mongoose.Types.ObjectId(),
         jobId: new mongoose.Types.ObjectId(),
@@ -42,7 +42,7 @@ describe('AnalysisModel validation', () => {
     await expect(analysis.validate()).resolves.toBeUndefined();
   });
 
-  it('T02', async () => {
+  it('T02: rejects missing profile snapshot', async () => {
     const analysis = new AnalysisModel({
         ownerId: new mongoose.Types.ObjectId(),
         jobId: new mongoose.Types.ObjectId(),

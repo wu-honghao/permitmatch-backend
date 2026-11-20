@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { connectTestDB, disconnectTestDB } from "./testDb.js";
-import { createTestUser } from "./helpers/testAuth.js";
-import { CandidateProfileModel } from "../models/candidateProfile.js";
-import { JobModel } from "../models/jobModel.js";
+import { connectTestDB, disconnectTestDB } from "../testDb.js";
+import { createTestUser } from "../helpers/testAuth.js";
+import { CandidateProfileModel } from "../../models/candidateProfile.js";
+import { JobModel } from "../../models/jobModel.js";
 import request from 'supertest'
-import app from "../app.js";
-import { AnalysisModel } from "../models/analysisModel.js";
+import app from "../../app.js";
+import { AnalysisModel } from "../../models/analysisModel.js";
 import mongoose from "mongoose";
-import { UserModel } from "../models/userModel.js";
+import { UserModel } from "../../models/userModel.js";
 
 let userA: Awaited<ReturnType<typeof createTestUser>> | undefined;
 let userB: Awaited<ReturnType<typeof createTestUser>> | undefined;
@@ -49,7 +49,7 @@ beforeAll(async ()=>{
 })
 
 describe('analysis.api', () => {
-    it('T0 analysis creates successfully and return 201', async () => {
+    it('T0: POST /jobs/:id/analyses creates analysis and returns 201', async () => {
         if (!userA || !jobId) {
             throw new Error("Test setup failed");
         }
@@ -69,7 +69,7 @@ describe('analysis.api', () => {
         expect(job?.latestAnalysisId?.toString()).toBe(analysisId)
     })
 
-    it("T1 analysis creates error return 500 and rollback", async () => {
+    it("T1: POST /jobs/:id/analyses returns 500 and rolls back on update failure", async () => {
         if (!userA || !jobId) {
             throw new Error("Test setup failed");
         }
@@ -100,7 +100,7 @@ describe('analysis.api', () => {
         }
     })
 
-    it("T2 userA check userA analysis", async () => {
+    it("T2: owner can retrieve an analysis over HTTP", async () => {
         if (!userA || !analysisId) {
             throw new Error("Test setup failed");
         }
@@ -110,7 +110,7 @@ describe('analysis.api', () => {
         expect(res.status).toBe(200)
     })
 
-    it("T3 userB check userA analysis", async () => {
+    it("T3: another user cannot retrieve an analysis over HTTP", async () => {
         if (!userB || !userA || !analysisId) {
             throw new Error("Test setup failed");
         }
@@ -120,7 +120,7 @@ describe('analysis.api', () => {
         expect(res.status).toBe(404)
     })
 
-    it("T4 userB get analysis for userA jobs", async () => {
+    it("T4: another user cannot list analyses for an owned job", async () => {
         if (!userB || !userA) {
             throw new Error("Test setup failed");
         }
@@ -130,7 +130,7 @@ describe('analysis.api', () => {
         expect(res.status).toBe(404)
     })
 
-    it("T5 userB create analysis for userA jobs", async () => {
+    it("T5: another user cannot create an analysis for an owned job", async () => {
         if (!userB || !userA) {
             throw new Error("Test setup failed");
         }
@@ -158,7 +158,7 @@ afterAll(async ()=>{
 
             await CandidateProfileModel.deleteMany({ userId: userA.userId })
 
-            await UserModel.deleteMany({ _id: userA.userId })
+            await UserModel.deleteMany({ _id: { $in: [userA.userId, userB?.userId].filter(Boolean) } })
         }
     } finally { 
         await disconnectTestDB()

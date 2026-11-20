@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
-import app from "../app.js";
-import { UserModel } from "../models/userModel.js";
-import { connectTestDB, disconnectTestDB } from "./testDb.js";
-import { createTestUser } from "./helpers/testAuth.js";
+import app from "../../app.js";
+import { UserModel } from "../../models/userModel.js";
+import { connectTestDB, disconnectTestDB } from "../testDb.js";
+import { createTestUser } from "../helpers/testAuth.js";
 import mongoose from "mongoose";
 
 const PASSWORD = "12234444";

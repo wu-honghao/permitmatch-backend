@@ -1,11 +1,11 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import app from "../app.js";
+import app from "../../app.js";
 import request from "supertest";
-import { UserModel } from "../models/userModel.js";
-import { CandidateProfileModel } from "../models/candidateProfile.js";
+import { UserModel } from "../../models/userModel.js";
+import { CandidateProfileModel } from "../../models/candidateProfile.js";
 import mongoose from "mongoose";
-import { connectTestDB, disconnectTestDB } from "./testDb.js";
-import { createTestUser } from "./helpers/testAuth.js";
+import { connectTestDB, disconnectTestDB } from "../testDb.js";
+import { createTestUser } from "../helpers/testAuth.js";
 
 let token = "";
 let userId = "";
